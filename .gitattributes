@@ -15,3 +15,9 @@
 *.PDF	 diff=astextplain
 *.rtf	 diff=astextplain
 *.RTF	 diff=astextplain
+*.ino  diff=astextplain
+*.png  diff=astextplain
+*.h    diff=astextplain
+*.txt  diff=astextplain
+*.bat  diff=astextplain
+*.md   diff=astextplain
