@@ -1,3 +1,3 @@
 to use the pupil maps, specify a negative radius of the dimension of the pupilMap.png file:
-pupilMapDragon.png, pupilMapLargeIris.png, PupilMapCross.png, pupilMapStar.png, PupilMapTest.png are -160
+pupilMapDragon.png, pupilMapLargeIris.png, pupilMapCross.png, pupilMapStar.png, pupilMapTest.png are -160
 pupilMapGoat.png is -128
