@@ -8,3 +8,6 @@ https://learn.adafruit.com/animated-electronic-eyes-using-teensy-3-1/overview
 Directory 'uncannyEyes' contains Arduino sketch for PJRC Teensy 3.1. 'uncannyEyes.ino' is the code, 'eyeData.h' is a set of arrays containing eye bitmaps, etc.
 
 Folder 'convert' contains Python sketch for generating eyeData.h. Requires Python Imaging Library. Example images are also in this directory.
+
+
+teensy uncannyeyes.ino code is modified to allow user to make the iris rotate in either direction continuously or upon initial startup to set iris to a desired position for a specialty iris, the python code is modified to allow a user to select a pupilmap if desired.
