@@ -98,7 +98,6 @@ struct {
 void setup(void) {
   uint8_t e;
 
-
   Serial.begin(115200);
   randomSeed(analogRead(A3)); // Seed random() from floating analog input
 
@@ -198,7 +197,7 @@ void drawEye( // Renders one eye.  Inputs must be pre-clipped & valid.
         d = (iScale * (p & 0x7F)) / 128;                // Distance (Y)
         if(d < IRIS_MAP_HEIGHT) {                       // Within iris area
           a = (IRIS_MAP_WIDTH * (p >> 7)) / 512;        // Angle (X)
-          a = (a + someOffset) % IRIS_MAP_WIDTH;        // Initial Rotation of iris
+          a = (a + someOffset + IRIS_MAP_WIDTH) % IRIS_MAP_WIDTH;        // Initial Rotation of iris
           p = iris[d][a];                               // Pixel = iris
         } else {                                        // Not in iris
           p = sclera[scleraY][scleraX];                 // Pixel = sclera
@@ -475,15 +474,13 @@ void split( // Subdivides motion path into two sub-paths w/randimization
 void loop() {
 //------- Begin Iris Rotation Code ----------//
 //someOffset = someOffset +1;
-
     someOffsetZ = (1 + someOffsetZ) % someOffsetR; // Iris Rotation Delay
-    if(someOffsetZ < 1) {
-    
-    someOffset += someOffsetS;
-
-    if(someOffset >= IRIS_MAP_WIDTH) someOffset -= IRIS_MAP_WIDTH;
-    else if(someOffset < 0) someOffset += IRIS_MAP_WIDTH;
-    }
+    if(someOffsetZ < 1) someOffset = (someOffset + someOffsetS) % IRIS_MAP_WIDTH;
+//    if(someOffsetZ < 1) {
+//    someOffset += someOffsetS;
+//    if(someOffset >= IRIS_MAP_WIDTH) someOffset -= IRIS_MAP_WIDTH;
+//    else if(someOffset < 0) someOffset += IRIS_MAP_WIDTH;
+//    }
 //------- End Iris Rotation Code ----------//
     
 #ifdef IRIS_PIN && (IRIS_PIN >= 0) // Interactive iris
