@@ -1,3 +1,4 @@
+
 //--------------------------------------------------------------------------
 // Uncanny eyes for PJRC Teensy 3.1 with Adafruit 1.5" OLED (product #1431)
 // or 1.44" TFT LCD (#2088).  This uses Teensy-3.1-specific features and
@@ -16,20 +17,18 @@
 #include <SPI.h>
 #include <Adafruit_GFX.h>      // Core graphics lib for Adafruit displays
 // Enable ONE of these #includes -- HUGE graphics tables for various eyes:
-//#include "defaultEye.h"        // Standard human-ish hazel eye
+#include "defaultEye.h"        // Standard human-ish hazel eye
 //#include "noScleraEye.h"       // Large iris, no sclera
 //#include "dragonEye.h"         // Slit pupil fiery dragon/demon eye
 //#include "goatEye.h"           // Horizontal pupil goat/Krampus eye
 //
-//#include "BlueFlameEye.h"           // 'Blue Flame Dragon Eye
-#include "MyEye.h"           // '
 //
 // Then tweak settings below, e.g. change IRIS_MIN/MAX or disable TRACKING.
 
 // DISPLAY HARDWARE CONFIG -------------------------------------------------
 
-#include <Adafruit_SSD1351.h>  // OLED display library -OR-
 //#include <Adafruit_ST7735.h> // TFT display library (enable one only)
+#include <Adafruit_SSD1351.h>  // OLED display library -OR-
 
 #ifdef _ADAFRUIT_ST7735H_
 typedef Adafruit_ST7735  displayType; // Using TFT display(s)
@@ -84,21 +83,58 @@ struct {
 };
 #define NUM_EYES (sizeof(eye) / sizeof(eye[0]))
 
+// Begin Iris Rotation code Variables //
+  int16_t someOffset = -67;  // Iris Initial Rotation for static position, 0 if rotating
+  int8_t someOffsetZ = -1;  // Iris Rotation Delay counter
+  int16_t someOffsetS = 1;  // Iris Rotation Step Increment, (how much Iris rotates each time it turns)
+  int8_t someOffsetR = 100;  // Iris Rotation Delay Rate ( > 0 ),  (1 through n, larger number greater delay)
+// End Iris Rotation code Variables //
 
+// Begin Eyelid Variables
+//  int16_t cEyelid = ((((255>>3)<<6) | (231>>2))<<5) | (33>>3);  // convert RGB to RGB16_5:6:5
+  int16_t cEyelid = 0;  // eyelids color
+  int16_t cEyeliner = 0;  // eyeliner color
+// End Eyelid Variables
+
+// Convert 24 bit RGBi color to 16bit RGB565 color.
+// 'i' is for intensity/brightness, 0=black, 1=full color brightness.   
+uint16_t RGBi24toRGB565(uint8_t r, uint8_t g, uint8_t b, float i) //i (0 to 1)is intensity or brightness
+{
+  return ((int(r*i)>>3)<<11) | ((int(g*i)>>2)<<5) | (int(b*i)>>3);
+}
 
 // INITIALIZATION -- runs once at startup ----------------------------------
 
-// Begin Iris Rotation code Variables //
-  int someOffset = 0;  // Iris Initial Rotation
-  int someOffsetZ = 0;  // Iris Rotation Delay counter
-  int someOffsetS = 0;  // Iris Rotation Step Increment, (how much Iris rotates each time it turns)
-  int someOffsetR = 1;  // Iris Rotation Delay Rate ( > 0 ),  (1 through n, larger number greater delay)
-// End Iris Rotation code Variables //
-
 void setup(void) {
+
   uint8_t e;
 
+// eyelid colors  
+//   0xFEA0;  //Supposed to be gold
+//   0xD566;  //Supposed to be gold
+//   0xCCAE;  //Supposed to be brass
+//   0xF6B8;  //Caucasian Flesh Tones
+//   0xDD11;  //Caucasian Flesh Tones
+//   0xE594;  //Caucasian Flesh Tones
+//   0xED93;  //Caucasian Flesh Tones
+//   0xFDD4;  //Caucasian Flesh Tones
+//   0xDD74;  //Caucasian Flesh Tones
+//   0xE5F5;  //Caucasian Flesh Tones
+//   0xE532;  //Caucasian Flesh Tones
+//   0xCCB0;  //Caucasian Flesh Tones
+//   0xAC0E;  //Caucasian Flesh Tones
+//   0x1882;  //FDD4 at 10% Ebony Flesh Tones
+//   0xFEA8;  //Minion Yellow1
+//   0xFF03;  //Minion Yellow2
+//   0xFE8B;  //Minion Yellow3
+
+  cEyelid = RGBi24toRGB565(217,163,139,1);
+  cEyeliner = RGBi24toRGB565(217,163,139,.95);  //eyeliner in this case is same color but 5% darker.
+  cEyelid = 0xED93;
+  cEyeliner = 0xCCAE;
+  
   Serial.begin(115200);
+
   randomSeed(analogRead(A3)); // Seed random() from floating analog input
 
   // Both displays share a common reset line; 0 is passed to display
@@ -143,9 +179,11 @@ void setup(void) {
 }
 
 
+
 // EYE-RENDERING FUNCTION --------------------------------------------------
 
 SPISettings settings(24000000, MSBFIRST, SPI_MODE3); // Teensy 3.1 max SPI
+//SPISettings settings(15000000, MSBFIRST, SPI_MODE3); // Teensy 3.1 max SPI in 96MHz
 
 void drawEye( // Renders one eye.  Inputs must be pre-clipped & valid.
   uint8_t  e,       // Eye array index; 0 or 1 for left/right
@@ -177,18 +215,22 @@ void drawEye( // Renders one eye.  Inputs must be pre-clipped & valid.
   digitalWrite(DISPLAY_DC, HIGH);                     // Data mode
   // Now just issue raw 16-bit values for every pixel...
 
-
-
-
   scleraXsave = scleraX; // Save initial X value to reset on each line
   irisY       = scleraY - (SCLERA_HEIGHT - IRIS_HEIGHT) / 2;
   for(screenY=0; screenY<SCREEN_HEIGHT; screenY++, scleraY++, irisY++) {
     scleraX = scleraXsave;
     irisX   = scleraXsave - (SCLERA_WIDTH - IRIS_WIDTH) / 2;
     for(screenX=0; screenX<SCREEN_WIDTH; screenX++, scleraX++, irisX++) {
-      if((lower[screenY][screenX] <= lT) ||
-         (upper[screenY][screenX] <= uT)) {             // Covered by eyelid
-        p = 0;
+      if((lower[screenY][screenX] <= (lT-10)) ||
+         (upper[screenY][screenX] <= (uT-8))) {             // this could probably be better but it works, tested with multiplying by .9 but that slowed it down too noticibly.
+//         p=0; //eyelids color in 16bit RGB 5-6-5
+        p = cEyelid;         
+         }
+      else if((lower[screenY][screenX] <= (lT)) ||
+         (upper[screenY][screenX] <= (uT))) {             // Covered by eyelid
+//        p = 0;  //eyelids color in 16bit RGB 5-6-5
+        p = cEyeliner;
+
       } else if((irisY < 0) || (irisY >= IRIS_HEIGHT) ||
                 (irisX < 0) || (irisX >= IRIS_WIDTH)) { // In sclera
         p = sclera[scleraY][scleraX];
@@ -241,8 +283,8 @@ const uint8_t ease[] = { // Ease in/out curve for eye movements 3*t^2-2*t^3
 uint32_t timeOfLastBlink = 0L, timeToNextBlink = 0L;
 #endif
 
-void frame( // Process motion for a single frame of left or right eye
-  uint16_t        iScale) {     // Iris scale (0-1023) passed in
+ // Process motion for a single frame of left or right eye
+void frame(uint16_t iScale) {     // Iris scale (0-1023) passed in
   static uint32_t frames   = 0; // Used in frame rate calculation
   static uint8_t  eyeIndex = 0; // eye[] array counter
   int16_t         eyeX, eyeY;
@@ -473,14 +515,8 @@ void split( // Subdivides motion path into two sub-paths w/randimization
 
 void loop() {
 //------- Begin Iris Rotation Code ----------//
-//someOffset = someOffset +1;
     someOffsetZ = (1 + someOffsetZ) % someOffsetR; // Iris Rotation Delay
     if(someOffsetZ < 1) someOffset = (someOffset + someOffsetS) % IRIS_MAP_WIDTH;
-//    if(someOffsetZ < 1) {
-//    someOffset += someOffsetS;
-//    if(someOffset >= IRIS_MAP_WIDTH) someOffset -= IRIS_MAP_WIDTH;
-//    else if(someOffset < 0) someOffset += IRIS_MAP_WIDTH;
-//    }
 //------- End Iris Rotation Code ----------//
     
 #ifdef IRIS_PIN && (IRIS_PIN >= 0) // Interactive iris
