@@ -137,6 +137,8 @@ uint16_t RGBi24toRGB565(uint8_t r, uint8_t g, uint8_t b, float i) //i (0 to 1)is
 void setup(void) {
 
   uint8_t e;
+//-------------------------------------------------------------------------  
+// Eyelid Pattern and ColorVariables
   pattern_sizeX2 = pattern_sizeX / 2;
 
 // eyelid colors, note convert the caucasian flesh tones to RGB then use the RGBi24toRGB565 converter to adjust to darker skin tones  
@@ -162,6 +164,7 @@ void setup(void) {
   cEyelid2 = RGBi24toRGB565(194,234,154,.65);  //eyelid at 65% brightness.
   cEyelid3 = RGBi24toRGB565(194,234,154,.45);  //eyelid at 45% brightness
   cEyelid4 = RGBi24toRGB565(194,234,154,.25);  //eyelid at 25% brightness.
+//-------------------------------------------------------------------------  
   
   Serial.begin(115200);
 
