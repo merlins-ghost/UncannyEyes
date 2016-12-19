@@ -1,5 +1,4 @@
-
-//--------------------------------------------------------------------------
+//------------------------------------------------------------------------
 // Uncanny eyes for PJRC Teensy 3.1 with Adafruit 1.5" OLED (product #1431)
 // or 1.44" TFT LCD (#2088).  This uses Teensy-3.1-specific features and
 // WILL NOT work on normal Arduino or other boards!  Use 72 MHz (Optimized)
@@ -17,11 +16,13 @@
 #include <SPI.h>
 #include <Adafruit_GFX.h>      // Core graphics lib for Adafruit displays
 // Enable ONE of these #includes -- HUGE graphics tables for various eyes:
-#include "defaultEye.h"        // Standard human-ish hazel eye
+//#include "defaultEye.h"        // Standard human-ish hazel eye
 //#include "noScleraEye.h"       // Large iris, no sclera
 //#include "dragonEye.h"         // Slit pupil fiery dragon/demon eye
 //#include "goatEye.h"           // Horizontal pupil goat/Krampus eye
 //
+//#include "MyEyeHuman1.h"           //
+#include "MyEyeHuman2.h"           //
 //
 // Then tweak settings below, e.g. change IRIS_MIN/MAX or disable TRACKING.
 
@@ -69,7 +70,7 @@ typedef Adafruit_SSD1351 displayType; // Using OLED display(s)
 typedef struct {
   int8_t   pin;       // Optional button here for indiv. wink
   uint8_t  state;     // NOBLINK/ENBLINK/DEBLINK
-  int32_t  duration;  // Duration of blink state (micros)
+  uint32_t  duration;  // Duration of blink state (micros) *** why is this a signed integer??? changed to unsigned ***
   uint32_t startTime; // Time (micros) of last state change
 } eyeBlink;
 
@@ -83,33 +84,62 @@ struct {
 };
 #define NUM_EYES (sizeof(eye) / sizeof(eye[0]))
 
+//-------------------------------------------------------------------------  
 // Begin Iris Rotation code Variables //
-  int16_t someOffset = -67;  // Iris Initial Rotation for static position, 0 if rotating
-  int8_t someOffsetZ = -1;  // Iris Rotation Delay counter
-  int16_t someOffsetS = 1;  // Iris Rotation Step Increment, (how much Iris rotates each time it turns)
-  int8_t someOffsetR = 100;  // Iris Rotation Delay Rate ( > 0 ),  (1 through n, larger number greater delay)
+  int16_t Rotation = -67;  // Iris Initial Rotation for static position, 0 if rotating
+  int8_t RotationZ = -1;  // Iris Rotation Delay counter. Leave set at -1 for initial value.
+  int16_t RotationS = 00;  // Iris Rotation Step Increment, (how much Iris rotates each time it turns, can be a negative number)
+  int8_t RotationR = 1;  // Iris Rotation Delay Rate ( > 0 ),  (1 through n, larger number greater delay)
 // End Iris Rotation code Variables //
-
-// Begin Eyelid Variables
+//-------------------------------------------------------------------------  
+// Eyelid Pattern Variables
 //  int16_t cEyelid = ((((255>>3)<<6) | (231>>2))<<5) | (33>>3);  // convert RGB to RGB16_5:6:5
-  int16_t cEyelid = 0;  // eyelids color
-  int16_t cEyeliner = 0;  // eyeliner color
-// End Eyelid Variables
+  int16_t cEyelid1 = 0;  // eyelid color 1
+  int16_t cEyelid2 = 0;  // eyelid color 2
+  int16_t cEyelid3 = 0;  // eyelid color 3
+  int16_t cEyelid4 = 0;  // eyelid color 4
+  int8_t pattern_sizeX2; // eyelid pattern offset for even odd/rows
 
-// Convert 24 bit RGBi color to 16bit RGB565 color.
-// 'i' is for intensity/brightness, 0=black, 1=full color brightness.   
+// Arrays are [Y][X]
+
+const  int8_t pattern_sizeX = 18;
+const  int8_t pattern_sizeY = 14;
+const  int8_t pattern[14][18] = {
+   {1,4,4,3,3,2,2,2,1,1,1,2,2,2,3,3,4,4}, 
+   {1,4,4,3,3,2,2,2,1,1,1,2,2,2,3,3,4,4},
+   {1,4,4,3,3,2,2,2,1,1,1,2,2,2,3,3,4,4},
+   {1,4,4,3,3,2,2,2,1,1,1,2,2,2,3,3,4,4},
+   {1,4,4,3,3,2,2,2,1,1,1,2,2,2,3,3,4,4},
+   {1,4,4,3,3,2,2,2,1,1,1,2,2,2,3,3,4,4},
+   {1,4,4,3,3,2,2,2,1,1,1,2,2,2,3,3,4,4},
+   {1,4,4,3,3,2,2,2,2,2,2,2,2,2,3,3,4,4},
+   {1,4,4,3,3,2,2,2,2,2,2,2,2,2,3,3,4,4},
+   {1,4,4,3,3,3,2,2,2,2,2,2,2,3,3,3,4,4},
+   {1,4,4,4,3,3,3,3,3,3,3,3,3,3,3,4,4,4},
+   {1,1,4,4,4,3,3,3,3,3,3,3,3,3,4,4,4,1},
+   {1,1,2,4,4,4,4,4,4,4,4,4,4,4,4,4,2,1},
+   {1,1,2,2,2,4,4,4,4,4,4,4,4,4,2,2,2,1}
+    } ;
+
+// End Eyelid Pattern Variables
+//-------------------------------------------------------------------------  
+
+//-------------------------------------------------------------------------  
+// Convert RGB24i to RGB565   (Need to redo to not use floating point)
 uint16_t RGBi24toRGB565(uint8_t r, uint8_t g, uint8_t b, float i) //i (0 to 1)is intensity or brightness
 {
   return ((int(r*i)>>3)<<11) | ((int(g*i)>>2)<<5) | (int(b*i)>>3);
 }
+//-------------------------------------------------------------------------  
 
 // INITIALIZATION -- runs once at startup ----------------------------------
 
 void setup(void) {
 
   uint8_t e;
+  pattern_sizeX2 = pattern_sizeX / 2;
 
-// eyelid colors  
+// eyelid colors, note convert the caucasian flesh tones to RGB then use the RGBi24toRGB565 converter to adjust to darker skin tones  
 //   0xFEA0;  //Supposed to be gold
 //   0xD566;  //Supposed to be gold
 //   0xCCAE;  //Supposed to be brass
@@ -128,10 +158,10 @@ void setup(void) {
 //   0xFF03;  //Minion Yellow2
 //   0xFE8B;  //Minion Yellow3
 
-  cEyelid = RGBi24toRGB565(217,163,139,1);
-  cEyeliner = RGBi24toRGB565(217,163,139,.95);  //eyeliner in this case is same color but 5% darker.
-  cEyelid = 0xED93;
-  cEyeliner = 0xCCAE;
+  cEyelid1 = RGBi24toRGB565(194,234,154,.85);  //eyelid at 85% brightness.
+  cEyelid2 = RGBi24toRGB565(194,234,154,.65);  //eyelid at 65% brightness.
+  cEyelid3 = RGBi24toRGB565(194,234,154,.45);  //eyelid at 45% brightness
+  cEyelid4 = RGBi24toRGB565(194,234,154,.25);  //eyelid at 25% brightness.
   
   Serial.begin(115200);
 
@@ -176,14 +206,17 @@ void setup(void) {
   eye[0].display.writeCommand(SSD1351_CMD_SETREMAP);
   eye[0].display.writeData(0x76);
 #endif
+
 }
-
-
 
 // EYE-RENDERING FUNCTION --------------------------------------------------
 
-SPISettings settings(24000000, MSBFIRST, SPI_MODE3); // Teensy 3.1 max SPI
-//SPISettings settings(15000000, MSBFIRST, SPI_MODE3); // Teensy 3.1 max SPI in 96MHz
+//SPI.begin(); 
+//SPISettings settings(24000000, MSBFIRST, SPI_MODE3); // Teensy 3.1 max SPI (works at 72MHz, but not really 24MHz is actually 18MHz)
+SPISettings settings(19999999, MSBFIRST, SPI_MODE3); // Teensy 3.1 SSD1351 OLED max SPI (Works at 72MHz-120MHz(oled), will downscale to cpu clock/4 or /8 as necessary to keep below the oled 20MHz limit)
+//SPI_CLOCK_DIV2;
+//SPI.setClockDivider(0x02);
+//SPISettings settings(15000000, MSBFIRST, SPI_MODE3); // Teensy 3.1 max SPI in 96MHz (oled)
 
 void drawEye( // Renders one eye.  Inputs must be pre-clipped & valid.
   uint8_t  e,       // Eye array index; 0 or 1 for left/right
@@ -197,11 +230,18 @@ void drawEye( // Renders one eye.  Inputs must be pre-clipped & valid.
   int16_t  irisX, irisY;
   uint16_t p, a;
   uint32_t d;
-
+//--------------------------------------------------------------------------------------
+//Eyelid Variables
+  uint8_t I, J, K;  // modulus values for pattern
+//--------------------------------------------------------------------------------------
+  
   // Set up raw pixel dump to entire screen.  Although such writes can wrap
   // around automatically from end of rect back to beginning, the region is
   // reset on each frame here in case of an SPI glitch.
   SPI.beginTransaction(settings);
+//  delayMicroseconds(10000);
+//  SPI.setClockDivider(SPI_CLOCK_DIV2);
+ 
 #ifdef _ADAFRUIT_ST7735H_ // TFT
   eye[e].display.setAddrWindow(0, 0, 127, 127);
 #else // OLED
@@ -221,16 +261,36 @@ void drawEye( // Renders one eye.  Inputs must be pre-clipped & valid.
     scleraX = scleraXsave;
     irisX   = scleraXsave - (SCLERA_WIDTH - IRIS_WIDTH) / 2;
     for(screenX=0; screenX<SCREEN_WIDTH; screenX++, scleraX++, irisX++) {
-      if((lower[screenY][screenX] <= (lT-10)) ||
-         (upper[screenY][screenX] <= (uT-8))) {             // this could probably be better but it works, tested with multiplying by .9 but that slowed it down too noticibly.
-//         p=0; //eyelids color in 16bit RGB 5-6-5
-        p = cEyelid;         
-         }
-      else if((lower[screenY][screenX] <= (lT)) ||
+//--------------------------------------------------------------------------------------
+//Eyelid Code
+      K = (screenY / pattern_sizeY) % 2; 
+      J = screenY % pattern_sizeY;
+      if (K==0) {
+        I = screenX % pattern_sizeX;
+      }
+      else {
+        I = (pattern_sizeX2 + screenX) % pattern_sizeX;
+      }
+      
+      if((lower[screenY][screenX] <= (lT)) ||
          (upper[screenY][screenX] <= (uT))) {             // Covered by eyelid
-//        p = 0;  //eyelids color in 16bit RGB 5-6-5
-        p = cEyeliner;
-
+          switch  (pattern[J][I]) {
+            case 1:{
+              p = cEyelid1;
+                }break;
+            case 2:{
+              p = cEyelid2;
+                }break;
+            case 3:{
+              p = cEyelid3;
+                }break;
+            case 4:{
+              p = cEyelid4;
+                }break;
+            default:{
+              p = 0;
+                }break;}
+//--------------------------------------------------------------------------------------
       } else if((irisY < 0) || (irisY >= IRIS_HEIGHT) ||
                 (irisX < 0) || (irisX >= IRIS_WIDTH)) { // In sclera
         p = sclera[scleraY][scleraX];
@@ -239,23 +299,25 @@ void drawEye( // Renders one eye.  Inputs must be pre-clipped & valid.
         d = (iScale * (p & 0x7F)) / 128;                // Distance (Y)
         if(d < IRIS_MAP_HEIGHT) {                       // Within iris area
           a = (IRIS_MAP_WIDTH * (p >> 7)) / 512;        // Angle (X)
-          a = (a + someOffset + IRIS_MAP_WIDTH) % IRIS_MAP_WIDTH;        // Initial Rotation of iris
+          a = (a + Rotation + IRIS_MAP_WIDTH) % IRIS_MAP_WIDTH;        // Initial Rotation of iris
           p = iris[d][a];                               // Pixel = iris
         } else {                                        // Not in iris
           p = sclera[scleraY][scleraX];                 // Pixel = sclera
         }
       }
       // SPI FIFO technique from Paul Stoffregen's ILI9341_t3 library:
-      while(KINETISK_SPI0.SR & 0xC000); // Wait for space in FIFO
+      while(KINETISK_SPI0.SR & 0xC000); // Wait for space in FIFO 0xC000
       KINETISK_SPI0.PUSHR = p | SPI_PUSHR_CTAS(1) | SPI_PUSHR_CONT;
     }
   }
 
   KINETISK_SPI0.SR |= SPI_SR_TCF;         // Clear transfer flag
-  while((KINETISK_SPI0.SR & 0xF000) ||    // Wait for SPI FIFO to drain
+  while((KINETISK_SPI0.SR & 0xF000) ||    // Wait for SPI FIFO to drain 0xF000
        !(KINETISK_SPI0.SR & SPI_SR_TCF)); // Wait for last bit out
   digitalWrite(eye[e].cs, HIGH);          // Deselect
   SPI.endTransaction();
+  delay(1); // is this really necessary?
+//  delayMicroseconds(10000);
 }
 
 
@@ -283,14 +345,14 @@ const uint8_t ease[] = { // Ease in/out curve for eye movements 3*t^2-2*t^3
 uint32_t timeOfLastBlink = 0L, timeToNextBlink = 0L;
 #endif
 
- // Process motion for a single frame of left or right eye
-void frame(uint16_t iScale) {     // Iris scale (0-1023) passed in
+void frame( // Process motion for a single frame of left or right eye
+  uint16_t        iScale) {     // Iris scale (0-1023) passed in
   static uint32_t frames   = 0; // Used in frame rate calculation
   static uint8_t  eyeIndex = 0; // eye[] array counter
   int16_t         eyeX, eyeY;
   uint32_t        t = micros(); // Time at start of function
 
-  Serial.println((++frames * 1000) / millis()); // Show frame rate
+  Serial.println((++frames * 1000) / millis()); // Show frame rate (framerate)
 
   if(++eyeIndex >= NUM_EYES) eyeIndex = 0; // Cycle through eyes, 1 per call
 
@@ -514,12 +576,13 @@ void split( // Subdivides motion path into two sub-paths w/randimization
 // MAIN LOOP -- runs continuously after setup() ----------------------------
 
 void loop() {
+
 //------- Begin Iris Rotation Code ----------//
-    someOffsetZ = (1 + someOffsetZ) % someOffsetR; // Iris Rotation Delay
-    if(someOffsetZ < 1) someOffset = (someOffset + someOffsetS) % IRIS_MAP_WIDTH;
+    RotationZ = (1 + RotationZ) % RotationR; // Iris Rotation Delay
+    if(RotationZ < 1) Rotation = (Rotation + RotationS) % IRIS_MAP_WIDTH;
 //------- End Iris Rotation Code ----------//
     
-#ifdef IRIS_PIN && (IRIS_PIN >= 0) // Interactive iris
+#ifdef IRIS_PIN && (IRIS_PIN >= 0) // Interactive iris  ***
 
   uint16_t v = analogRead(IRIS_PIN);       // Raw dial/photocell reading
 #ifdef IRIS_PIN_FLIP
