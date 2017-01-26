@@ -94,11 +94,11 @@ struct {
 //-------------------------------------------------------------------------  
 // Eyelid Pattern Variables
 //  int16_t cEyelid = ((((255>>3)<<6) | (231>>2))<<5) | (33>>3);  // convert RGB to RGB16_5:6:5
-  int16_t cEyelid1 = 0;  // eyelid color 1
-  int16_t cEyelid2 = 0;  // eyelid color 2
-  int16_t cEyelid3 = 0;  // eyelid color 3
-  int16_t cEyelid4 = 0;  // eyelid color 4
-  int8_t pattern_sizeX2; // eyelid pattern offset for even odd/rows
+  uint16_t cEyelid1 = 0;  // eyelid color 1
+  uint16_t cEyelid2 = 0;  // eyelid color 2
+  uint16_t cEyelid3 = 0;  // eyelid color 3
+  uint16_t cEyelid4 = 0;  // eyelid color 4
+  uint8_t pattern_offset =0; // eyelid pattern offset for even odd/rows
 
 // Arrays are [Y][X]
 
@@ -121,15 +121,34 @@ const  int8_t pattern[14][18] = {
    {1,1,2,2,2,4,4,4,4,4,4,4,4,4,2,2,2,1}
     } ;
 
+
 // End Eyelid Pattern Variables
 //-------------------------------------------------------------------------  
 
 //-------------------------------------------------------------------------  
-// Convert RGB24i to RGB565   (Need to redo to not use floating point)
-uint16_t RGBi24toRGB565(uint8_t r, uint8_t g, uint8_t b, float i) //i (0 to 1)is intensity or brightness
+// Convert to RGB565
+// The function removes the lower 3 bits from Red and Blue, and the lower 2 bits from Green and applies the Intensity value.
+// The Intensity value of 255 is full brightness, 0 is full black.  Some color information is lost in the conversion to RGB565.
+
+uint16_t RGBi888toRGB565(uint8_t R8, uint8_t G8,  uint8_t B8, uint8_t I8) // change the brightness of individual 8 bit RGB color channels and convert to RGB565 
 {
-  return ((int(r*i)>>3)<<11) | ((int(g*i)>>2)<<5) | (int(b*i)>>3);
+//  return ((int((R8 * I8) / 255)>>3)<<11) | ((int((G8*I8) / 255)>>2)<<5) | (int((B8 * I8) / 255)>>3);
+  return ((((R8 * I8) / 255) & 248)<<8) | ((((G8 * I8) / 255) & 252)<<3) | (((B8 * I8) / 255)>>3);
 }
+
+uint16_t RGBi24toRGB565(uint32_t rgb, uint8_t I8) //Change the brightness of an RGB24 bit color value and convert result to RGB565 
+{
+//  return (((((rgb>>16) * I8) / 255) & 248)<<8) | ((((((rgb>>8) & 255) * I8) / 255) & 252)<<3) | ((((rgb & 255) * I8) / 255)>>3);
+  return (((((rgb & 0xFF0000) * I8) / 255) & 0xF80000)>>8) | (((((rgb & 0x00FF00) * I8) / 255) & 0x00FC00)>>5) | ((((rgb & 0x0000FF) * I8) / 255)>>3);
+}
+
+uint16_t RGBi565(uint16_t rgb, uint8_t I8)  //Change the brightness of an RGB565 color value
+{
+//  return (((((rgb>>11) * I8) / 255) & 31)<<11) | ((((((rgb>>5) & 63) * I8) / 255))<<3) | ((((rgb & 255) * I8)/255)>>3);
+  return ((((rgb & 0xF800) * I8) / 255) & 0xF800) | ((((rgb & 0x7E0) * I8) / 255) & 0x7E0) | ((((rgb & 0x1F) * I8)/255) & 0x1F);
+}
+
+
 //-------------------------------------------------------------------------  
 
 // INITIALIZATION -- runs once at startup ----------------------------------
@@ -137,33 +156,41 @@ uint16_t RGBi24toRGB565(uint8_t r, uint8_t g, uint8_t b, float i) //i (0 to 1)is
 void setup(void) {
 
   uint8_t e;
+    pattern_offset = pattern_sizeX / 2;
 //-------------------------------------------------------------------------  
 // Eyelid Pattern and ColorVariables
-  pattern_sizeX2 = pattern_sizeX / 2;
+  
 
-// eyelid colors, note convert the caucasian flesh tones to RGB then use the RGBi24toRGB565 converter to adjust to darker skin tones  
-//   0xFEA0;  //Supposed to be gold
-//   0xD566;  //Supposed to be gold
-//   0xCCAE;  //Supposed to be brass
-//   0xF6B8;  //Caucasian Flesh Tones
-//   0xDD11;  //Caucasian Flesh Tones
-//   0xE594;  //Caucasian Flesh Tones
-//   0xED93;  //Caucasian Flesh Tones
-//   0xFDD4;  //Caucasian Flesh Tones
-//   0xDD74;  //Caucasian Flesh Tones
-//   0xE5F5;  //Caucasian Flesh Tones
-//   0xE532;  //Caucasian Flesh Tones
-//   0xCCB0;  //Caucasian Flesh Tones
-//   0xAC0E;  //Caucasian Flesh Tones
-//   0x1882;  //FDD4 at 10% Ebony Flesh Tones
-//   0xFEA8;  //Minion Yellow1
-//   0xFF03;  //Minion Yellow2
-//   0xFE8B;  //Minion Yellow3
+// eyelid colors, note convert the caucasian flesh tones to RGB then use the RGBi24toRGB565 converter to adjust to darker skin tones
+// RGB565   RGB24      RGB888  
+// 0xFEA0 = 0xF86A00 = 248,106,0   //Supposed to be gold
+// 0xD566 = 0xD05606 = 208,86,6    //Supposed to be gold
+// 0xCCAE = 0xC84A0E = 200,74,14   //Supposed to be brass
+// 0xF6B8 = 0xF06A18 = 240,106,24  //Caucasian Flesh Tones
+// 0xDD11 = 0xD85011 = 216,80,17   //Caucasian Flesh Tones
+// 0xE594 = 0xE05814 = 224,88,20   //Caucasian Flesh Tones
+// 0xED93 = 0xE85813 = 232,88,19   //Caucasian Flesh Tones
+// 0xFDD4 = 0xF85C14 = 248,92,20   //Caucasian Flesh Tones
+// 0xDD74 = 0xD85614 = 216,86,20   //Caucasian Flesh Tones
+// 0xE5F5 = 0xE05E15 = 224,94,21   //Caucasian Flesh Tones
+// 0xE532 = 0xE05212 = 224,82,18   //Caucasian Flesh Tones
+// 0xCCB0 = 0xC84A10 = 200,74,16   //Caucasian Flesh Tones
+// 0xAC0E = 0xA8400E = 168,64,14   //Caucasian Flesh Tones
+// 0xFDD4 = 0xF85C14 = 248,92,20   //Caucasian Flesh Tones
+// 0x1882 = 0x180802 = 24,8,2      //FDD4 at 10% Ebony Flesh Tones, same result should be achieved with RGBi888toRGB565(248,92,20,26)
+// 0xFEA8 = 0xF86A08 = 248,106,8   //Minion Yellow1
+// 0xFF03 = 0xF87003 = 248,112,3   //Minion Yellow2
+// 0xFE8B = 0xF8680B = 248,104,11  //Minion Yellow3
+//        = 0xC2EA9A = 194,234,154 //Test Color (217=85%,166=65%,115=45%,64=25%)
 
-  cEyelid1 = RGBi24toRGB565(194,234,154,.85);  //eyelid at 85% brightness.
-  cEyelid2 = RGBi24toRGB565(194,234,154,.65);  //eyelid at 65% brightness.
-  cEyelid3 = RGBi24toRGB565(194,234,154,.45);  //eyelid at 45% brightness
-  cEyelid4 = RGBi24toRGB565(194,234,154,.25);  //eyelid at 25% brightness.
+//  cEyelid1 = RGBi888toRGB565(194,234,154,217);  //eyelid at 85% brightness.
+//  cEyelid2 = RGBi888toRGB565(194,234,154,166);  //eyelid at 65% brightness.
+//  cEyelid3 = RGBi888toRGB565(194,234,154,115);  //eyelid at 45% brightness
+//  cEyelid4 = RGBi888toRGB565(194,234,154,64);  //eyelid at 25% brightness.
+  cEyelid1 = RGBi24toRGB565(0xC2EA9A,217);  //eyelid at 85% brightness.
+  cEyelid2 = RGBi24toRGB565(0xC2EA9A,166);  //eyelid at 65% brightness.
+  cEyelid3 = RGBi24toRGB565(0xC2EA9A,115);  //eyelid at 45% brightness
+  cEyelid4 = RGBi24toRGB565(0xC2EA9A,64);  //eyelid at 25% brightness.
 //-------------------------------------------------------------------------  
   
   Serial.begin(115200);
@@ -235,7 +262,7 @@ void drawEye( // Renders one eye.  Inputs must be pre-clipped & valid.
   uint32_t d;
 //--------------------------------------------------------------------------------------
 //Eyelid Variables
-  uint8_t I, J, K;  // modulus values for pattern
+static  uint8_t I, J, K;  // modulus values for pattern
 //--------------------------------------------------------------------------------------
   
   // Set up raw pixel dump to entire screen.  Although such writes can wrap
@@ -265,16 +292,11 @@ void drawEye( // Renders one eye.  Inputs must be pre-clipped & valid.
     irisX   = scleraXsave - (SCLERA_WIDTH - IRIS_WIDTH) / 2;
     for(screenX=0; screenX<SCREEN_WIDTH; screenX++, scleraX++, irisX++) {
 //--------------------------------------------------------------------------------------
-//Eyelid Code
+//Colored Eyelid Code
       K = (screenY / pattern_sizeY) % 2; 
       J = screenY % pattern_sizeY;
-      if (K==0) {
-        I = screenX % pattern_sizeX;
-      }
-      else {
-        I = (pattern_sizeX2 + screenX) % pattern_sizeX;
-      }
-      
+      I = ((pattern_offset * K) + screenX) % pattern_sizeX;
+   
       if((lower[screenY][screenX] <= (lT)) ||
          (upper[screenY][screenX] <= (uT))) {             // Covered by eyelid
           switch  (pattern[J][I]) {
